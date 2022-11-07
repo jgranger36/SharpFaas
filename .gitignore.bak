@@ -6,7 +6,6 @@
 dist/
 .app/
 
-Properties/
 
 *.suo
 *.user
