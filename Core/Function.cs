@@ -11,15 +11,17 @@ public class Function
     public string Lane { get; set; }
     public Version Version { get; set; }
     public Extension FileExtension { get; set; }
-    
+    public string Payload { get; set; }
 
-    public Function(string name,Extension fileExtension,string lane, string version,string entryFileName = null)
+
+    public Function(string name,Extension fileExtension,string lane, string version,string payload,string entryFileName = null)
     {
         Name = name;
         FileExtension = fileExtension;
         Lane = lane;
-        EntryFileName = entryFileName;
+        EntryFileName = entryFileName ?? name;
         Version = version.ToVersion();
+        Payload = payload;
     }
 
     public string RemoteDirectory => Path.Combine(Name, Lane);

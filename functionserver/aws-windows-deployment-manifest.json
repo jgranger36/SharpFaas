@@ -1,0 +1,14 @@
+{
+  "manifestVersion": 1,
+  "deployments": {
+    "aspNetCoreWeb": [
+      {
+        "name": "functionserver",
+        "parameters": {
+          "appBundle": "functionserver.zip",
+          "iisPath": "/"
+        }
+      }
+    ]
+  }
+}

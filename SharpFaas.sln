@@ -4,6 +4,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "functionserver", "functions
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Core", "Core\Core.csproj", "{4BF6F106-0008-4300-AEB2-466D1B662645}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SampleFunction", "SampleFunction\SampleFunction.csproj", "{AA187309-96A5-4223-B638-F007241E5193}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -18,5 +20,9 @@ Global
 		{4BF6F106-0008-4300-AEB2-466D1B662645}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{4BF6F106-0008-4300-AEB2-466D1B662645}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{4BF6F106-0008-4300-AEB2-466D1B662645}.Release|Any CPU.Build.0 = Release|Any CPU
+		{AA187309-96A5-4223-B638-F007241E5193}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{AA187309-96A5-4223-B638-F007241E5193}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{AA187309-96A5-4223-B638-F007241E5193}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{AA187309-96A5-4223-B638-F007241E5193}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal

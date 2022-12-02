@@ -11,12 +11,14 @@ public class FtpStore : IFunctionStore
     public FtpClient Client { get; }
     private ILogger _logger;
 
-    public FtpStore(FunctionFtp functionFtp,string localStore, ILogger logger)
+    public FtpStore(Configuration configuration,string localStore, ILogger logger)
     {
         _logger = logger;
-        RemoteStorePath = functionFtp.FtpFolder;
+        RemoteStorePath = configuration.FtpFolder;
         LocalStorePath = localStore;
-        Client = new FtpClient(functionFtp.FtpServer, functionFtp.FtpUser, functionFtp.FtpPassword);
+        Client = new FtpClient(configuration.FtpServer, configuration.FtpUser, configuration.FtpPassword);
+        Client.ReadTimeout = 60000;
+        Client.ConnectTimeout = 60000;
         Client.AutoConnect();
     }
 
