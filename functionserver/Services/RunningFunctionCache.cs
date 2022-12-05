@@ -15,7 +15,7 @@ public class RunningFunctionCache
         {
             runningFunction.Task = Task.Run(runningFunction.Action);
             
-            _cache[runningFunction.RunningFunctionId] = runningFunction;
+            _cache[runningFunction.InstanceId] = runningFunction;
         }
         finally
         {
@@ -23,14 +23,14 @@ public class RunningFunctionCache
         }
     }
     
-    public void Remove(Guid RunningFunctionId)
+    public void Remove(Guid instanceId)
     {
         _semaphore.Wait();
         
         try
         {
-            if (_cache.TryGetValue(RunningFunctionId, out RunningFunction runningFunction) && runningFunction.Task.IsCompleted )
-                _cache.Remove(RunningFunctionId);
+            if (_cache.TryGetValue(instanceId, out RunningFunction runningFunction) && runningFunction.Task.IsCompleted )
+                _cache.Remove(instanceId);
         }
         finally
         {
@@ -38,18 +38,18 @@ public class RunningFunctionCache
         }
     }
     
-    public RunningFunction? Get(Guid runningFunctionId)
+    public RunningFunction? Get(Guid instanceId)
     {
         RunningFunction? runningFunction = null;
         _semaphore.Wait();
         
         try
         {
-            if (_cache.TryGetValue(runningFunctionId, out runningFunction))
+            if (_cache.TryGetValue(instanceId, out runningFunction))
             {
 
                 if (runningFunction.Task.IsCompleted)
-                    _cache.Remove(runningFunctionId);
+                    _cache.Remove(instanceId);
             }
         }
         finally
@@ -85,7 +85,7 @@ public class RunningFunctionCache
         try
         {
             var functionsToRemove = _cache
-                .Where(f => f.Value.Task.IsCompleted && f.Value.StartTime < DateTime.UtcNow.AddMinutes(-60))
+                .Where(f => f.Value.Task.IsCompleted && f.Value.StartTime < DateTime.UtcNow.AddMinutes(-15))
                 .Select(f => f.Key);
             
             if(functionsToRemove != null)
@@ -102,7 +102,7 @@ public class RunningFunctionCache
 
     public class RunningFunction
     {
-        public Guid RunningFunctionId { get; set; }
+        public Guid InstanceId { get; set; }
         public string CallerId { get; set; }
         public Task Task { get; set; }
         public FunctionFile Function { get; set; }
