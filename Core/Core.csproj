@@ -4,12 +4,12 @@
         <TargetFramework>net6.0</TargetFramework>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
-        <AssemblyVersion>1.0.1</AssemblyVersion>
-        <FileVersion>1.0.1</FileVersion>
+        <AssemblyVersion>1.0.2</AssemblyVersion>
+        <FileVersion>1.0.2</FileVersion>
         <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
         <RepositoryUrl>https://github.com/jgranger36/SharpFaas</RepositoryUrl>
         <PackageId>Sharpfaas.Core</PackageId>
-        <PackageVersion>1.0.1</PackageVersion>
+        <PackageVersion>1.0.2</PackageVersion>
     </PropertyGroup>
 
 </Project>
