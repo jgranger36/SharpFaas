@@ -14,6 +14,8 @@ public class S3Store : IFunctionStore
     private AmazonS3Client _s3Client;
     private string _bucketName;
 
+    //TODO:not working right now, need to finish
+    [Obsolete]
     public S3Store(string bucketName,string secret,string key,string region, ILogger logger)
     {
         _logger = logger;
