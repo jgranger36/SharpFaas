@@ -9,15 +9,10 @@ using ILogger = Microsoft.Extensions.Logging.ILogger;
 var builder = WebApplication.CreateBuilder(args);
 
 var config = builder.Configuration.Get<Configuration>();
-config.FunctionDirectory = AppContext.BaseDirectory;
 
+config.FunctionDirectory = Path.Combine(AppContext.BaseDirectory,"Functions");
+Directory.CreateDirectory(config.FunctionDirectory);
 builder.Services.AddSingleton(config);
-builder.Services.AddSingleton<FunctionExecutor>();
-builder.Services.AddSingleton(new Encryption(config.EncryptionKey));
-var runningFunctionCache = new RunningFunctionCache();
-builder.Services.AddSingleton(
-    runningFunctionCache);
-builder.Services.AddSingleton(new FunctionManager(runningFunctionCache));
 
 builder.Services.Configure<KestrelServerOptions>(options =>
 {
@@ -42,8 +37,7 @@ builder.Logging.ClearProviders();
 builder.Logging.AddSerilog(logger);
 builder.Services.AddSingleton(iLogger);
 
-
-if (string.IsNullOrWhiteSpace(config.FunctionDirectory))
+if (!string.IsNullOrWhiteSpace(config.BucketName))
 {
     var s3 = new S3Store(config.BucketName, config.BucketAccessSecret, config.BucketAccessKey, config.BucketRegion,
         iLogger);
@@ -52,12 +46,15 @@ if (string.IsNullOrWhiteSpace(config.FunctionDirectory))
 }
 else
 {
-    Directory.CreateDirectory(config.FunctionDirectory);
-    
     var ftp = new FtpStore(config, config.FunctionDirectory,iLogger);
     
     builder.Services.AddSingleton<IFunctionStore>(ftp);
 }
+
+builder.Services.AddSingleton(new Encryption(config.EncryptionKey));
+builder.Services.AddSingleton<FunctionExecutor>();
+builder.Services.AddSingleton<RunningFunctionCache>();
+builder.Services.AddHostedService<FunctionManager>();
 
 builder.Services.AddControllers();
 builder.Services.AddSwaggerGen();
