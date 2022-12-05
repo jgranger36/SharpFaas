@@ -2,6 +2,7 @@
 using Core.Interfaces;
 using Core;
 using McMaster.NETCore.Plugins;
+using Newtonsoft.Json;
 
 namespace functionserver.Services;
 
@@ -17,7 +18,7 @@ public class FunctionExecutor
     }
     
     public void FunctionHandler(
-        Function function,string pathToAssembly, CancellationToken token)
+        FunctionFile function,string pathToAssembly, CancellationToken token)
     {
         PluginLoader loader = null;
         try
@@ -51,7 +52,7 @@ public class FunctionExecutor
     }
     
     public void ProcessHandler(
-        Function function,string pathToAssembly,CancellationToken token)
+        FunctionFile function,string pathToAssembly,CancellationToken token)
     {
         try
         {
@@ -65,7 +66,7 @@ public class FunctionExecutor
                 StartInfo = new ProcessStartInfo
                 {
                     FileName = pathToAssembly,
-                    Arguments = function.Payload,
+                    Arguments = JsonConvert.SerializeObject(function.Payload),
                     UseShellExecute = true
                 }
             };

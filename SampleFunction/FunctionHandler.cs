@@ -1,8 +1,10 @@
 ﻿using Core.Interfaces;
 using Dapper;
 using Microsoft.Data.SqlClient;
+using Microsoft.Extensions.Logging.Abstractions;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using S3;
 
 namespace SampleFunction;
 
@@ -13,30 +15,22 @@ public class FunctionHandler : IFunction
     public string Label { get; } = "SampleFunction";
     public string Description { get; } = "sample function used for testing sharpfaas";
     public DateTime StartTime { get; } = DateTime.UtcNow;
-    public StringWriter FunctionConsole { get; set; }
-    public async Task ExecuteAsync(string jsonPayload, StringWriter writer = null)
+    
+    public async Task ExecuteAsync(IPayload payload)
     {
-        FunctionConsole = writer;
+        var jsonObject = JsonConvert.DeserializeObject<JObject>(payload.Body);
 
-        var jsonObject = JsonConvert.DeserializeObject<JObject>(jsonPayload);
-        
-        using(var conn = new SqlConnection((string)jsonObject["connectionString"]))
+        var clientId = payload.Parameters["callerId"];
+        var venueId = payload.Parameters["venueId"];
+
+        await using (var bucket = new ThirdPartySales(NullLogger.Instance,clientId,this.Label,venueId ))
         {
-            for (int i = 1; i != 0 ;i++)
+            bucket.PutOrder(new ThirdPartySales.TPSPayload
             {
-                var update = await conn.QuerySingleAsync("select * from dbo.[update] order by rowupdated offset @i rows fetch next 1 rows only ", new {i});
-
-                if (update is null)
-                    i = 0;
-                
-                await conn.ExecuteAsync((string)jsonObject["insertQuery"],new {i,payload = update.File});
-
-                await Task.Delay(5000);
-            }
+                Key = (string)jsonObject["uniqueId"],
+                Payload = payload.Body,
+            });
         }
-
-        if ((bool) jsonObject["throwError"])
-            throw new Exception("ERROR WAS THROWN.");
 
     }
 }

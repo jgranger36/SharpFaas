@@ -14,6 +14,7 @@
       <PackageReference Include="Dapper" Version="2.0.123" />
       <PackageReference Include="Microsoft.Data.SqlClient" Version="5.0.1" />
       <PackageReference Include="Newtonsoft.Json" Version="13.0.2" />
+      <PackageReference Include="YellowDog.Thirdparty.S3" Version="2.0.0" />
     </ItemGroup>
 
 </Project>

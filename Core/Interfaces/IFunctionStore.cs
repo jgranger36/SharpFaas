@@ -5,6 +5,6 @@ public interface IFunctionStore
     string LocalStorePath { get; }
     string RemoteStorePath { get; }
 
-    Task<Function> PushFunctionAsync(Function function, bool newVersion, Stream zipArchive);
-    Task<string> GetFunctionAsync(Function function);
+    Task<FunctionFile> PushFunctionAsync(FunctionFile function, bool newVersion, Stream zipArchive);
+    Task<string> GetFunctionAsync(FunctionFile function);
 }

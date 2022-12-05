@@ -8,19 +8,29 @@ using ILogger = Microsoft.Extensions.Logging.ILogger;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddSignalR();
-
 var config = builder.Configuration.Get<Configuration>();
 
 builder.Services.AddSingleton(config);
 builder.Services.AddSingleton<FunctionExecutor>();
 builder.Services.AddSingleton(new Encryption(config.EncryptionKey));
+var runningFunctionCache = new RunningFunctionCache();
 builder.Services.AddSingleton(
-    new RunningFunctionCache());
+    runningFunctionCache);
+builder.Services.AddSingleton(new FunctionManager(runningFunctionCache));
 
 builder.Services.Configure<KestrelServerOptions>(options =>
 {
     options.Limits.MaxRequestBodySize = int.MaxValue; // if don't set default value is: 30 MB
+    
+    if(config.http_port.HasValue)
+        options.ListenAnyIP(config.http_port.Value, listenOptions =>
+        {
+        });
+    if(config.https_port.HasValue)
+        options.ListenAnyIP(config.https_port.Value, listenOptions =>
+        {
+            listenOptions.UseHttps();
+        });
 });
 
 Environment.CurrentDirectory = AppContext.BaseDirectory;
@@ -47,7 +57,6 @@ else
     
     builder.Services.AddSingleton<IFunctionStore>(ftp);
 }
-
 
 builder.Services.AddControllers();
 builder.Services.AddSwaggerGen();

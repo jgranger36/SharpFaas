@@ -2,6 +2,8 @@
 
 public class Configuration
 {
+    public int? http_port { get; set; }
+    public int? https_port { get; set; }
     public string EncryptionKey { get; set; }
     public string FunctionDirectory { get; set; }
     public string FtpServer { get; set; }

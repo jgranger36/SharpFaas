@@ -1,4 +1,5 @@
-﻿using Core;
+﻿using System.Text.Json;
+using Core;
 using Core.Helpers;
 using Core.Interfaces;
 using functionserver.Services;
@@ -32,9 +33,9 @@ public class FunctionController : ControllerBase
         IFormFile file,
         CancellationToken cancellationToken)
     {
-        Function.Extension.TryParse(type, out Function.Extension extension);
+        FunctionFile.Extension.TryParse(type, out FunctionFile.Extension extension);
 
-        var function = new Function(functionName, extension, lane, String.Empty, null);
+        var function = new FunctionFile(functionName, extension, lane, String.Empty, null);
 
         if (file.Length <= 0)
             return BadRequest("Empty file");
@@ -55,36 +56,40 @@ public class FunctionController : ControllerBase
 
     [HttpPost(Name = "runfunction")]
     public async Task<IActionResult> RunFunction(
-        string callerId,
-        Guid? instanceId,
+
         string functionName,
-        string payload,
+        [FromBody] JsonElement payload,
+        string? callerId,
+        Guid? instanceId,
         string? lane = "latest",
         string? version = "0",
         bool? payLoadEncrypted = false,
-        string? type = "dll",
-        string? entryFileName = null)
+        string? type = "dll")
     {
-        var file = "";
-        Task task = null;
+        instanceId = instanceId.HasValue ? instanceId.Value : Guid.NewGuid();
+        var headers = HttpContext.Request.Headers;
+        var parameters = HttpContext.Request.Query;
         var cancellationTokenSource = new CancellationTokenSource();
         var startTime = DateTime.UtcNow;
-        var function = new Function(functionName, Function.Extension.dll, lane, version, payload, entryFileName);
+        var function = new FunctionFile(functionName, FunctionFile.Extension.dll, lane, version, new Payload
+        {
+            Url = HttpContext.Request.QueryString.ToString(),
+            Headers = headers.ToDictionary(h => h.Key.ToString(),h => h.Value.ToString()),
+            Parameters = parameters.ToDictionary(q => q.Key.ToString(), q => q.Value.ToString()),
+            Body = payload.GetRawText()
+        });
+        
         var response = new Response()
         {
             CallerId = callerId, FunctionName = functionName, Lane = lane, Version = version, Type = type,
-            InstanceId = instanceId.HasValue ? instanceId.Value : Guid.NewGuid()
+            InstanceId = instanceId.Value
         };
+        
         try
         {
-            if (Function.Extension.TryParse(type, out Function.Extension extension))
+            if (FunctionFile.Extension.TryParse(type, out FunctionFile.Extension extension))
             {
                 function.FileExtension = extension;
-
-                if (payLoadEncrypted.Value)
-                    function.Payload = _encryption.DecryptString(payload);
-
-                file = function.File;
 
                 var pathToAssembly = await _functionStore.GetFunctionAsync(function);
 
@@ -92,21 +97,29 @@ public class FunctionController : ControllerBase
                     throw new Exception("Could not find assembly.");
 
                 var token = cancellationTokenSource.Token;
+
+                var runningFunction = new RunningFunctionCache.RunningFunction
+                {
+                    RunningFunctionId = instanceId.Value,
+                    CallerId = callerId,
+                    Function = function,
+                    StartTime = startTime,
+                    PathToAssembly = pathToAssembly,
+                    Action = () => _functionExecutor.ProcessHandler(function, pathToAssembly,token),
+                    TokenSource = cancellationTokenSource
+                };
+
+                if (extension is FunctionFile.Extension.dll)
+                    runningFunction.Action = () => _functionExecutor.FunctionHandler(function, pathToAssembly,token);
+
+                else if (extension is FunctionFile.Extension.exe)
+                    runningFunction.Action = () => _functionExecutor.ProcessHandler(function, pathToAssembly,token);
                 
-                if (extension is Function.Extension.dll)
-                    task = Task.Run(() => _functionExecutor.FunctionHandler(function, pathToAssembly,token),
-                        cancellationTokenSource.Token);
-
-                else if (extension is Function.Extension.exe)
-                    task = Task.Run(() => _functionExecutor.ProcessHandler(function, pathToAssembly,token),
-                        cancellationTokenSource.Token);
-
-                _runningFunctionCache._cache[response.InstanceId] =
-                    (task, function, startTime, cancellationTokenSource);
+                _runningFunctionCache.Add(runningFunction);
 
                 response.ElapsedTimeInSeconds = Convert.ToInt32((DateTime.UtcNow - startTime).TotalSeconds);
                 response.Version = function.Version.ToString();
-                response.TaskStatus = task.Status.ToString();
+                response.TaskStatus = TaskStatus.WaitingToRun.ToString();
 
                 return Ok(response.ToString());
             }
@@ -119,13 +132,6 @@ public class FunctionController : ControllerBase
         }
         catch (Exception ex)
         {
-            if (_runningFunctionCache._cache.ContainsKey(instanceId.Value))
-            {
-                if (!task.IsCompleted)
-                    cancellationTokenSource.Cancel();
-                _runningFunctionCache._cache.Remove(instanceId.Value);
-            }
-
             response.ElapsedTimeInSeconds = Convert.ToInt32((DateTime.UtcNow - startTime).TotalSeconds);
             response.Version = function.Version.ToString();
             response.TaskStatus = TaskStatus.Faulted.ToString();
@@ -139,26 +145,25 @@ public class FunctionController : ControllerBase
     [HttpGet(Name = "checkfunction")]
     public async Task<IActionResult> CheckFunction(Guid instanceId)
     {
-        if (_runningFunctionCache._cache.TryGetValue(instanceId,
-                out (Task Task, Function function, DateTime startTime, CancellationTokenSource cancellationTokenSource)
-                value))
-        {
-            if (value.Task.IsCompleted)
-                _runningFunctionCache._cache.Remove(instanceId);
 
+        RunningFunctionCache.RunningFunction? runningFunction = _runningFunctionCache.Get(instanceId);
+        
+        if (runningFunction != null)
+        {
             return Ok(JsonConvert.SerializeObject(new
             {
                 InstanceId = instanceId,
-                FunctionName = value.function.Name,
-                Lane = value.function.Lane,
-                Version = value.function.Version,
-                Type = value.function.FileExtension.ToString(),
-                TaskStatus = value.Task.Status.ToString(),
-                Exceptions = value.Task.Exception != null
-                    ? value.Task.Exception.InnerExceptions.Select(e => e.Message).ToList()
-                        .Concat(new List<string>() {value.Task.Exception.Message})
+                CallerId = runningFunction.CallerId,
+                FunctionName = runningFunction.Function.Name,
+                Lane = runningFunction.Function.Lane,
+                Version = runningFunction.Function.Version,
+                Type = runningFunction.Function.FileExtension.ToString(),
+                TaskStatus = runningFunction.Task.Status.ToString(),
+                Exceptions = runningFunction.Task.Exception != null
+                    ? runningFunction.Task.Exception.InnerExceptions.Select(e => e.Message).ToList()
+                        .Concat(new List<string>() {runningFunction.Task.Exception.Message})
                     : null,
-                ElapsedTimeInSeconds = Convert.ToInt32((DateTime.UtcNow - value.startTime).TotalSeconds)
+                ElapsedTimeInSeconds = Convert.ToInt32((DateTime.UtcNow - runningFunction.StartTime).TotalSeconds)
             }));
         }
 
@@ -175,70 +180,39 @@ public class FunctionController : ControllerBase
     [HttpGet(Name = "getactivefunctions")]
     public async Task<IActionResult> GetActiveFunctions()
     {
-        return Ok(JsonConvert.SerializeObject(_runningFunctionCache._cache.Select(f => new
+        var runningFunctions = _runningFunctionCache.GetAll();
+        return Ok(JsonConvert.SerializeObject(runningFunctions.Select(f => new
         {
-            InstanceId = f.Key,
-            FunctionName = f.Value.function.Name,
-            Lane = f.Value.function.Lane,
-            Version = f.Value.function.Version,
-            Type = f.Value.function.FileExtension.ToString(),
-            TaskStatus = f.Value.task.Status.ToString(),
-            Exceptions = f.Value.task.Exception != null
-                ? f.Value.task.Exception.InnerExceptions.Select(e => e.Message).ToList()
-                    .Concat(new List<string>() {f.Value.task.Exception.Message})
+            InstanceId = f.RunningFunctionId,
+            CallerId = f.CallerId,
+            FunctionName = f.Function.Name,
+            Lane = f.Function.Lane,
+            Version = f.Function.Version,
+            Type = f.Function.FileExtension.ToString(),
+            TaskStatus = f.Task.Status.ToString(),
+            Exceptions = f.Task.Exception != null
+                ? f.Task.Exception.InnerExceptions.Select(e => e.Message).ToList()
+                    .Concat(new List<string>() {f.Task.Exception.Message})
                 : null,
-            ElapsedTimeInSeconds = Convert.ToInt32((DateTime.UtcNow - f.Value.startTime).TotalSeconds)
+            ElapsedTimeInSeconds = Convert.ToInt32((DateTime.UtcNow - f.StartTime).TotalSeconds)
         })));
     }
 
     [HttpPut(Name = "cancelfunction")]
     public async Task<IActionResult> CancelFunction(Guid instanceId)
     {
-        if (_runningFunctionCache._cache.TryGetValue(instanceId,
-                out (Task Task, Function function, DateTime startTime, CancellationTokenSource cancellationTokenSource)
-                value))
+        _runningFunctionCache.Remove(instanceId);
+        
+        return Ok(JsonConvert.SerializeObject(new
         {
-            if (!value.Task.IsCompleted)
-            {
-                value.cancellationTokenSource.Cancel();
+            InstanceId = instanceId
+        }));
+    }
 
-                while (!value.Task.IsCanceled)
-                {
-                    await Task.Delay(100);
-                }
-            }
-
-            _runningFunctionCache._cache.Remove(instanceId);
-
-            return Ok(JsonConvert.SerializeObject(new
-            {
-                InstanceId = instanceId,
-                FunctionName = value.function.Name,
-                Lane = value.function.Lane,
-                Version = value.function.Version,
-                Type = value.function.FileExtension.ToString(),
-                TaskStatus = value.Task.Status.ToString(),
-                Exceptions = value.Task.Exception != null
-                    ? value.Task.Exception.InnerExceptions.Select(e => e.Message).ToList()
-                        .Concat(new List<string>() {value.Task.Exception.Message})
-                    : null,
-                ElapsedTimeInSeconds = Convert.ToInt32((DateTime.UtcNow - value.startTime).TotalSeconds)
-            }));
-        }
-        else
-        {
-            return Ok(JsonConvert.SerializeObject(new
-            {
-                InstanceId = instanceId,
-                FunctionName = "",
-                Lane = "",
-                Version = "",
-                Type = "",
-                TaskStatus = "NoTaskFound",
-                Exceptions = new List<string>(0),
-                ElapsedTimeInSeconds = 0
-            }));
-        }
+    [HttpGet(Name = "getserverstatus")]
+    public async Task<IActionResult> GetServerStatus()
+    {
+        return Ok(new {Status = "Active"});
     }
 
     public class Response

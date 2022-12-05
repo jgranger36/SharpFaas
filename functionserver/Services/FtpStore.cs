@@ -8,23 +8,25 @@ namespace functionserver.Services;
 
 public class FtpStore : IFunctionStore
 {
-    public FtpClient Client { get; }
+
     private ILogger _logger;
+    private Configuration _configuration;
 
     public FtpStore(Configuration configuration,string localStore, ILogger logger)
     {
         _logger = logger;
         RemoteStorePath = configuration.FtpFolder;
         LocalStorePath = localStore;
-        Client = new FtpClient(configuration.FtpServer, configuration.FtpUser, configuration.FtpPassword);
+        _configuration = configuration;
+    }
+
+    public async Task<FunctionFile> PushFunctionAsync(FunctionFile function,bool newVersion, Stream zipArchive)
+    {
+        var Client = new FtpClient(_configuration.FtpServer, _configuration.FtpUser, _configuration.FtpPassword);
         Client.ReadTimeout = 60000;
         Client.ConnectTimeout = 60000;
         Client.AutoConnect();
-    }
-
-    public async Task<Function> PushFunctionAsync(Function function,bool newVersion, Stream zipArchive)
-    {
-
+        
         var listing = Client.GetListing(Path.Combine(RemoteStorePath,function.RemoteDirectory).ToFtpPath());
 
         if (listing.Length > 0)
@@ -46,8 +48,13 @@ public class FtpStore : IFunctionStore
         return function;
     }
 
-    public async Task<string> GetFunctionAsync(Function function)
+    public async Task<string> GetFunctionAsync(FunctionFile function)
     {
+        var Client = new FtpClient(_configuration.FtpServer, _configuration.FtpUser, _configuration.FtpPassword);
+        Client.ReadTimeout = 60000;
+        Client.ConnectTimeout = 60000;
+        Client.AutoConnect();
+        
         if (!File.Exists(Path.Combine(LocalStorePath,function.File)))
         {
             if (function.Version.Major == 0 || function.Version.Minor == 0)

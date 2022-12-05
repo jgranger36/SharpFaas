@@ -1,25 +1,26 @@
 ﻿
 
 using Core.Helpers;
+using Core.Interfaces;
 
 namespace Core;
 
-public class Function
+public class FunctionFile
 {
     public string Name { get; set; }
     public string EntryFileName { get; set; }
     public string Lane { get; set; }
     public Version Version { get; set; }
     public Extension FileExtension { get; set; }
-    public string Payload { get; set; }
+    public IPayload Payload { get; set; }
 
 
-    public Function(string name,Extension fileExtension,string lane, string version,string payload,string entryFileName = null)
+    public FunctionFile(string name,Extension fileExtension,string lane, string version,IPayload payload)
     {
         Name = name;
         FileExtension = fileExtension;
         Lane = lane;
-        EntryFileName = entryFileName ?? name;
+        EntryFileName = name;
         Version = version.ToVersion();
         Payload = payload;
     }

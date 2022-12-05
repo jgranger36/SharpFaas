@@ -7,8 +7,6 @@ public interface IFunction
     string Label { get; }
     string Description { get; }
     DateTime StartTime { get; }
-    StringWriter FunctionConsole { get; set; }
-
-
-    Task ExecuteAsync(string jsonPayload,StringWriter writer = null);
+    
+    Task ExecuteAsync(IPayload payload);
 }

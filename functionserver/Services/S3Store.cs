@@ -29,7 +29,7 @@ public class S3Store : IFunctionStore
 
     public string RemoteStorePath => _functionStoreImplementation.RemoteStorePath;
 
-    public async Task<Function> PushFunctionAsync(Function function,bool newVersion, Stream zipArchive)
+    public async Task<FunctionFile> PushFunctionAsync(FunctionFile function,bool newVersion, Stream zipArchive)
     {
         var request = new ListObjectsRequest()
         {
@@ -67,7 +67,7 @@ public class S3Store : IFunctionStore
         return function;
     }
 
-    public async Task<string> GetFunctionAsync(Function function)
+    public async Task<string> GetFunctionAsync(FunctionFile function)
     {
         return await _functionStoreImplementation.GetFunctionAsync(function);
     }
