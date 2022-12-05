@@ -29,13 +29,12 @@ public class FunctionController : ControllerBase
     }
 
     [HttpPost(Name = "pushfunction")]
-    public async Task<IActionResult> PushFunction(string functionName, string type, string lane, bool newVersion,
-        IFormFile file,
-        CancellationToken cancellationToken)
+    public async Task<IActionResult> PushFunction(string functionName,IFormFile file, string? type = "dll", string? lane = "latest", string? entryFileName = null,bool? newVersion = false)
     {
-        FunctionFile.Extension.TryParse(type, out FunctionFile.Extension extension);
-
-        var function = new FunctionFile(functionName, extension, lane, String.Empty, null);
+        if (!FunctionFile.Extension.TryParse(type, out FunctionFile.Extension extension))
+            return BadRequest(new {message = $"Invalid function extension: {type}"});
+        
+        var function = new FunctionFile(functionName, extension, lane, String.Empty,entryFileName ,null);
 
         if (file.Length <= 0)
             return BadRequest("Empty file");
@@ -43,7 +42,7 @@ public class FunctionController : ControllerBase
         if (file.FileName.EndsWith("zip"))
         {
             var response =
-                await _functionStore.PushFunctionAsync(function, newVersion, file.OpenReadStream());
+                await _functionStore.PushFunctionAsync(function, newVersion.Value, file.OpenReadStream());
 
             return Ok(
                 $"Saved function {functionName} to function store in lane: {lane} as version {function.Version.ToString()}");
@@ -59,11 +58,12 @@ public class FunctionController : ControllerBase
 
         string functionName,
         [FromBody] JsonElement payload,
-        string? callerId,
+        string callerId,
         Guid? instanceId,
         string? lane = "latest",
         string? version = "0",
         bool? payLoadEncrypted = false,
+        string? entryFileName = null,
         string? type = "dll")
     {
         instanceId = instanceId.HasValue ? instanceId.Value : Guid.NewGuid();
@@ -71,12 +71,14 @@ public class FunctionController : ControllerBase
         var parameters = HttpContext.Request.Query;
         var cancellationTokenSource = new CancellationTokenSource();
         var startTime = DateTime.UtcNow;
-        var function = new FunctionFile(functionName, FunctionFile.Extension.dll, lane, version, new Payload
+        var function = new FunctionFile(functionName, FunctionFile.Extension.dll, lane, version, entryFileName,new Payload
         {
-            Url = HttpContext.Request.QueryString.ToString(),
+            Url = HttpContext.Request.Path,
             Headers = headers.ToDictionary(h => h.Key.ToString(),h => h.Value.ToString()),
             Parameters = parameters.ToDictionary(q => q.Key.ToString(), q => q.Value.ToString()),
-            Body = payload.GetRawText()
+            Body = payload.GetRawText(),
+            InstanceId = instanceId.Value,
+            CallerId = callerId
         });
         
         var response = new Response()
@@ -100,7 +102,7 @@ public class FunctionController : ControllerBase
 
                 var runningFunction = new RunningFunctionCache.RunningFunction
                 {
-                    RunningFunctionId = instanceId.Value,
+                    InstanceId = instanceId.Value,
                     CallerId = callerId,
                     Function = function,
                     StartTime = startTime,
@@ -183,7 +185,7 @@ public class FunctionController : ControllerBase
         var runningFunctions = _runningFunctionCache.GetAll();
         return Ok(JsonConvert.SerializeObject(runningFunctions.Select(f => new
         {
-            InstanceId = f.RunningFunctionId,
+            InstanceId = f.InstanceId,
             CallerId = f.CallerId,
             FunctionName = f.Function.Name,
             Lane = f.Function.Lane,
