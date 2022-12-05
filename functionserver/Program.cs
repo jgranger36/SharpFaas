@@ -14,21 +14,6 @@ config.FunctionDirectory = Path.Combine(AppContext.BaseDirectory,"Functions");
 Directory.CreateDirectory(config.FunctionDirectory);
 builder.Services.AddSingleton(config);
 
-builder.Services.Configure<KestrelServerOptions>(options =>
-{
-    options.Limits.MaxRequestBodySize = int.MaxValue; // if don't set default value is: 30 MB
-    
-    if(config.http_port.HasValue)
-        options.ListenAnyIP(config.http_port.Value, listenOptions =>
-        {
-        });
-    if(config.https_port.HasValue)
-        options.ListenAnyIP(config.https_port.Value, listenOptions =>
-        {
-            listenOptions.UseHttps();
-        });
-});
-
 Environment.CurrentDirectory = AppContext.BaseDirectory;
 var logger = new LoggerConfiguration().ReadFrom.Configuration(builder.Configuration).CreateLogger();
 ILogger iLogger = new LoggerFactory().AddSerilog(logger).CreateLogger("sharpfaas");
@@ -54,7 +39,22 @@ else
 builder.Services.AddSingleton(new Encryption(config.EncryptionKey));
 builder.Services.AddSingleton<FunctionExecutor>();
 builder.Services.AddSingleton<RunningFunctionCache>();
-builder.Services.AddHostedService<FunctionManager>();
+builder.Services.AddSingleton<FunctionManager>();
+
+builder.Services.Configure<KestrelServerOptions>(options =>
+{
+    options.Limits.MaxRequestBodySize = int.MaxValue; // if don't set default value is: 30 MB
+    
+    if(config.http_port.HasValue)
+        options.ListenAnyIP(config.http_port.Value, listenOptions =>
+        {
+        });
+    if(config.https_port.HasValue)
+        options.ListenAnyIP(config.https_port.Value, listenOptions =>
+        {
+            listenOptions.UseHttps();
+        });
+});
 
 builder.Services.AddControllers();
 builder.Services.AddSwaggerGen();

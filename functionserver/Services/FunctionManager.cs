@@ -1,23 +1,23 @@
 ﻿namespace functionserver.Services;
 
-public class FunctionManager : BackgroundService
+public class FunctionManager
 {
     private RunningFunctionCache _runningFunctionCache;
     
     public FunctionManager(RunningFunctionCache runningFunctionCache)
     {
         _runningFunctionCache = runningFunctionCache;
+
+        ExecuteAsync();
     }
     
-    protected override Task ExecuteAsync(CancellationToken stoppingToken)
+    protected async Task ExecuteAsync()
     {
-        while (!stoppingToken.IsCancellationRequested)
+        while (true)
         {
-            Task.Delay(15 * 60000).Wait();
-            
             _runningFunctionCache.Clean();
+            
+            Task.Delay(15 * 60000).Wait();
         }
-
-        return Task.CompletedTask;
     }
 }
