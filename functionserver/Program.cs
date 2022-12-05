@@ -9,6 +9,7 @@ using ILogger = Microsoft.Extensions.Logging.ILogger;
 var builder = WebApplication.CreateBuilder(args);
 
 var config = builder.Configuration.Get<Configuration>();
+config.FunctionDirectory = AppContext.BaseDirectory;
 
 builder.Services.AddSingleton(config);
 builder.Services.AddSingleton<FunctionExecutor>();
